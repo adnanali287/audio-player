@@ -11,39 +11,30 @@
   <script>
     let ws;
     let audioContext;
-    let audioQueue = [];
+    let playbackTime;
+    const BUFFER_AHEAD = 0.5; // half a second of buffer
 
     function start() {
       audioContext = new AudioContext();
+      playbackTime = audioContext.currentTime + BUFFER_AHEAD;
+
       ws = new WebSocket("wss://audio-stream-backend-688e.onrender.com");
       ws.binaryType = "arraybuffer";
 
       ws.onmessage = (event) => {
-        const data = event.data.slice(0);
-        audioQueue.push(data);
+        const arrayBuffer = event.data.slice(0);
+        audioContext.decodeAudioData(arrayBuffer).then((buffer) => {
+          const source = audioContext.createBufferSource();
+          source.buffer = buffer;
+          source.connect(audioContext.destination);
+
+          // Schedule audio to play at the right time
+          source.start(playbackTime);
+          playbackTime += buffer.duration;
+        }).catch((err) => {
+          console.error("Decode error:", err);
+        });
       };
-
-      // Start playing with a 500ms buffer delay
-      setTimeout(playNext, 500);
-    }
-
-    function playNext() {
-      if (audioQueue.length === 0) {
-        setTimeout(playNext, 100);
-        return;
-      }
-
-      const chunk = audioQueue.shift();
-      audioContext.decodeAudioData(chunk, (buffer) => {
-        const source = audioContext.createBufferSource();
-        source.buffer = buffer;
-        source.connect(audioContext.destination);
-        source.start(0);
-        playNext(); // continue playing
-      }, (err) => {
-        console.error("Decode error", err);
-        playNext(); // skip bad chunk
-      });
     }
   </script>
 </body>
