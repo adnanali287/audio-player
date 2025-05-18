@@ -9,10 +9,10 @@
   <button onclick="start()">Start Listening</button>
   <div id="status">Idle</div>
 
-  <!-- Silent video for background playback -->
-  <video id="keepAlive" playsinline muted autoplay loop style="display: none;">
-    <source src="data:video/mp4;base64,AAAAHGZ0eXBtcDQyAAAAAG1wNDFtcDQyaXNvbThtcDQyaXNvbWF2YzEAAAAIZnJlZQ==" type="video/mp4">
-  </video>
+  <!-- Real audio element for background support -->
+  <audio id="keepAlive" autoplay loop>
+    <source src="data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCA//////////////////////8AAAAACAAADSAAAAEsAAABJbnRlcnBsYXllciBSZWFkAA==" type="audio/mp3">
+  </audio>
 
   <script>
     let ws;
@@ -22,10 +22,12 @@
     const MIN_BUFFER = 3;
 
     function start() {
-      // Start silent video
-      document.getElementById("keepAlive").play();
+      // Play real audio for lock screen support
+      const keepAlive = document.getElementById("keepAlive");
+      keepAlive.volume = 0.01; // inaudible but not muted
+      keepAlive.play();
 
-      // Start Web Audio
+      // Web audio setup
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
       ws = new WebSocket("wss://audio-stream-backend-688e.onrender.com");
       ws.binaryType = "arraybuffer";
