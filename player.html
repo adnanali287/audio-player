@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Audio Stream</title>
   <style>
@@ -45,7 +45,7 @@
       font-size: 18px;
       font-weight: 500;
       cursor: pointer;
-      margin-bottom: 32px;
+      margin-bottom: 24px;
       transition: background 0.2s ease;
     }
     button:active { background: #444; }
@@ -54,7 +54,6 @@
       color: var(--subtle);
       margin-bottom: 32px;
     }
-
     /* Visualizer */
     #visualizer {
       display: flex;
@@ -63,14 +62,14 @@
       width: 80%;
       max-width: 300px;
       height: 60px;
-      background: transparent;
+      margin-top: 16px;
     }
     .bar {
       flex: 1;
       background: var(--bar-bg);
       border-radius: 4px;
       height: 10%;
-      transition: height 0.1s ease-out;
+      transition: height 0.1s ease-out, background 0.1s ease-out;
     }
   </style>
 </head>
@@ -81,23 +80,40 @@
   <button onclick="start()">Listen</button>
   <div id="status">Idle</div>
   <div id="visualizer">
-    <!-- 20 bars -->
-    ${Array(20).fill().map((_,i)=>`<div class="bar" id="bar${i}"></div>`).join('')}
+    <div class="bar" id="bar0"></div>
+    <div class="bar" id="bar1"></div>
+    <div class="bar" id="bar2"></div>
+    <div class="bar" id="bar3"></div>
+    <div class="bar" id="bar4"></div>
+    <div class="bar" id="bar5"></div>
+    <div class="bar" id="bar6"></div>
+    <div class="bar" id="bar7"></div>
+    <div class="bar" id="bar8"></div>
+    <div class="bar" id="bar9"></div>
+    <div class="bar" id="bar10"></div>
+    <div class="bar" id="bar11"></div>
+    <div class="bar" id="bar12"></div>
+    <div class="bar" id="bar13"></div>
+    <div class="bar" id="bar14"></div>
+    <div class="bar" id="bar15"></div>
+    <div class="bar" id="bar16"></div>
+    <div class="bar" id="bar17"></div>
+    <div class="bar" id="bar18"></div>
+    <div class="bar" id="bar19"></div>
   </div>
 
   <script>
-    let ws, audioContext, analyser, dataArray, isPlaying=false, audioQueue=[];
+    let ws, audioContext, analyser, dataArray, isPlaying = false, audioQueue = [];
     const MIN_BUFFER = 3, BAR_COUNT = 20;
 
     function start() {
       const status = document.getElementById('status');
       status.textContent = 'Connecting…';
 
-      audioContext = new (window.AudioContext||window.webkitAudioContext)();
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
       analyser = audioContext.createAnalyser();
       analyser.fftSize = BAR_COUNT * 2;
-      const bufferLength = analyser.frequencyBinCount;
-      dataArray = new Uint8Array(bufferLength);
+      dataArray = new Uint8Array(analyser.frequencyBinCount);
 
       ws = new WebSocket('wss://audio-stream-backend-688e.onrender.com');
       ws.binaryType = 'arraybuffer';
@@ -105,30 +121,31 @@
       ws.onopen = () => status.textContent = 'Waiting for audio…';
       ws.onmessage = e => {
         audioQueue.push(e.data);
-        if (!isPlaying && audioQueue.length>=MIN_BUFFER) {
-          isPlaying=true;
-          status.textContent='🎧 Listening';
+        if (!isPlaying && audioQueue.length >= MIN_BUFFER) {
+          isPlaying = true;
+          status.textContent = '🎧 Listening';
           playNext();
           renderVisualizer();
         }
       };
       ws.onclose = () => {
-        isPlaying=false;
-        status.textContent='Disconnected';
+        isPlaying = false;
+        status.textContent = 'Disconnected';
       };
-      ws.onerror = () => status.textContent='Connection error';
+      ws.onerror = () => status.textContent = 'Connection error';
     }
 
     function playNext() {
       if (!audioQueue.length) {
-        isPlaying=false;
-        document.getElementById('status').textContent='Buffer underrun…';
+        isPlaying = false;
+        document.getElementById('status').textContent = 'Buffer underrun…';
         return;
       }
       const chunk = audioQueue.shift();
       audioContext.decodeAudioData(chunk, buffer => {
         const src = audioContext.createBufferSource();
         src.buffer = buffer;
+        // route through analyser then to output
         src.connect(analyser);
         analyser.connect(audioContext.destination);
         src.start();
@@ -139,11 +156,11 @@
     function renderVisualizer() {
       requestAnimationFrame(renderVisualizer);
       analyser.getByteFrequencyData(dataArray);
-      for (let i=0; i<BAR_COUNT; i++) {
+      for (let i = 0; i < BAR_COUNT; i++) {
         const bar = document.getElementById(`bar${i}`);
-        const value = dataArray[i]/255; // normalize 0–1
-        bar.style.height = `${Math.max(value,0.05)*100}%`;
-        bar.style.background = `rgb(${value*74+30},${value*222+33},${value*128+64})`;
+        const value = dataArray[i] / 255; // 0–1
+        bar.style.height = `${Math.max(value, 0.05) * 100}%`;
+        bar.style.background = `rgb(${value * 100 + 20}, ${value * 200 + 55}, ${value * 100 + 20})`;
       }
     }
   </script>
