@@ -9,14 +9,23 @@
   <button onclick="start()">Start Listening</button>
   <div id="status">Idle</div>
 
+  <!-- Silent video for background playback -->
+  <video id="keepAlive" playsinline muted autoplay loop style="display: none;">
+    <source src="data:video/mp4;base64,AAAAHGZ0eXBtcDQyAAAAAG1wNDFtcDQyaXNvbThtcDQyaXNvbWF2YzEAAAAIZnJlZQ==" type="video/mp4">
+  </video>
+
   <script>
     let ws;
     let audioContext;
     let audioQueue = [];
     let isPlaying = false;
-    let MIN_BUFFER = 3; // Number of chunks to buffer before playing
+    const MIN_BUFFER = 3;
 
     function start() {
+      // Start silent video
+      document.getElementById("keepAlive").play();
+
+      // Start Web Audio
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
       ws = new WebSocket("wss://audio-stream-backend-688e.onrender.com");
       ws.binaryType = "arraybuffer";
@@ -28,7 +37,7 @@
 
         if (!isPlaying && audioQueue.length >= MIN_BUFFER) {
           isPlaying = true;
-          playNext(); // start playing
+          playNext();
         }
       };
     }
@@ -47,12 +56,10 @@
         source.buffer = buffer;
         source.connect(audioContext.destination);
         source.start(0);
-        source.onended = () => {
-          playNext(); // move to next chunk after playback
-        };
+        source.onended = playNext;
       }, (err) => {
         console.error("Decode error", err);
-        playNext(); // skip bad chunk
+        playNext();
       });
     }
   </script>
