@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Audio Stream Player</title>
+</head>
+<body>
+  <h2>🔊 Live Audio Stream</h2>
+  <button onclick="connectStream()">Start Listening</button>
+
+  <script>
+    let audioContext;
+    let source;
+
+    function connectStream() {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const ws = new WebSocket("wss://audio-stream-backend-688e.onrender.com");
+      ws.binaryType = "arraybuffer";
+
+      ws.onmessage = (event) => {
+        const arrayBuffer = event.data;
+        audioContext.decodeAudioData(arrayBuffer.slice(0), (audioBuffer) => {
+          source = audioContext.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(audioContext.destination);
+          source.start(0);
+        });
+      };
+
+      ws.onopen = () => console.log("Connected to stream");
+      ws.onerror = (e) => console.error("WebSocket error", e);
+      ws.onclose = () => console.log("Connection closed");
+    }
+  </script>
+</body>
+</html>
