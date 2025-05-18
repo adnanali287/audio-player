@@ -11,41 +11,70 @@
       --subtle: #888888;
       --button-bg: #1f1f1f;
       --button-text: #FFFFFF;
-      --bar-bg: #222222;
-      --bar-active-start: 30,200,80;
-      --bar-active-end: 80,255,120;
     }
 
-    * { box-sizing: border-box; margin:0; padding:0; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      height:100vh; text-align:center; padding:20px;
+      font-family: -apple-system, BlinkMacSystemFont, “Segoe UI”, Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
+      padding: 20px;
     }
-    .icon { font-size:64px; margin-bottom:24px; }
-    h1 { font-size:32px; font-weight:600; margin-bottom:32px; }
+
+    .icon {
+      font-size: 64px;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 600;
+      margin-bottom: 32px;
+    }
+
     button {
       background: var(--button-bg);
       color: var(--button-text);
-      border:none; border-radius:32px;
-      padding:16px 48px; font-size:20px; font-weight:500;
-      cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.5);
-      transition: background .2s ease;
+      border: none;
+      border-radius: 32px;
+      padding: 16px 48px;
+      font-size: 20px;
+      font-weight: 500;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      transition: background 0.2s ease;
     }
-    button:active { background:#2a2a2a; }
-    #status { margin-top:24px; font-size:16px; color:var(--subtle); }
-    /* Visualizer */
-    #visualizer {
-      display:flex; align-items:flex-end;
-      gap:4px; width:80%; max-width:300px;
-      height:60px; margin-top:24px;
+
+    button:active {
+      background: #2a2a2a;
     }
-    .bar {
-      flex:1; background:var(--bar-bg);
-      border-radius:4px; height:10%;
-      transition: height .1s ease-out, background .1s ease-out;
+
+    #status {
+      margin-top: 24px;
+      font-size: 16px;
+      color: var(--subtle);
+    }
+
+    .pulse {
+      animation: pulse 1.5s infinite;
+      color: var(--text);
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.05); opacity: 0.7; }
+      100% { transform: scale(1); opacity: 1; }
     }
   </style>
 </head>
@@ -55,47 +84,17 @@
   <button onclick="start()">Listen</button>
   <div id="status">Idle</div>
 
-  <!-- visualizer container -->
-  <div id="visualizer">
-    <div class="bar" id="bar0"></div>
-    <div class="bar" id="bar1"></div>
-    <div class="bar" id="bar2"></div>
-    <div class="bar" id="bar3"></div>
-    <div class="bar" id="bar4"></div>
-    <div class="bar" id="bar5"></div>
-    <div class="bar" id="bar6"></div>
-    <div class="bar" id="bar7"></div>
-    <div class="bar" id="bar8"></div>
-    <div class="bar" id="bar9"></div>
-    <div class="bar" id="bar10"></div>
-    <div class="bar" id="bar11"></div>
-    <div class="bar" id="bar12"></div>
-    <div class="bar" id="bar13"></div>
-    <div class="bar" id="bar14"></div>
-    <div class="bar" id="bar15"></div>
-    <div class="bar" id="bar16"></div>
-    <div class="bar" id="bar17"></div>
-    <div class="bar" id="bar18"></div>
-    <div class="bar" id="bar19"></div>
-  </div>
-
   <script>
-    let ws, audioContext, analyser, dataArray, audioQueue = [], isPlaying = false;
-    const MIN_BUFFER = 3, BAR_COUNT = 20;
+    let ws, audioContext, audioQueue = [], isPlaying = false;
+    const MIN_BUFFER = 3;
 
     function start() {
       const statusDiv = document.getElementById("status");
-      statusDiv.textContent = "Connecting…";
-
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      // setup analyser
-      analyser = audioContext.createAnalyser();
-      analyser.fftSize = BAR_COUNT * 2;
-      dataArray = new Uint8Array(analyser.frequencyBinCount);
-      analyser.connect(audioContext.destination);
-
       ws = new WebSocket("wss://audio-stream-backend-688e.onrender.com");
       ws.binaryType = "arraybuffer";
+
+      statusDiv.textContent = "Connecting…";
 
       ws.onopen = () => statusDiv.textContent = "Waiting for audio…";
       ws.onmessage = e => {
@@ -103,15 +102,19 @@
         if (!isPlaying && audioQueue.length >= MIN_BUFFER) {
           isPlaying = true;
           statusDiv.textContent = "🎧 Listening";
+          statusDiv.classList.add("pulse");
           playNext();
-          renderVisualizer();
         }
       };
       ws.onclose = () => {
         isPlaying = false;
         statusDiv.textContent = "Disconnected";
+        statusDiv.classList.remove("pulse");
       };
-      ws.onerror = () => statusDiv.textContent = "Connection error";
+      ws.onerror = () => {
+        statusDiv.textContent = "Connection error";
+        statusDiv.classList.remove("pulse");
+      };
     }
 
     function playNext() {
@@ -119,32 +122,17 @@
       if (audioQueue.length === 0) {
         isPlaying = false;
         statusDiv.textContent = "Buffer underrun…";
+        statusDiv.classList.remove("pulse");
         return;
       }
       const chunk = audioQueue.shift();
       audioContext.decodeAudioData(chunk, buffer => {
         const src = audioContext.createBufferSource();
         src.buffer = buffer;
-        // route through analyser to destination
-        src.connect(analyser);
+        src.connect(audioContext.destination);
         src.start();
         src.onended = playNext;
       }, () => playNext());
-    }
-
-    function renderVisualizer() {
-      requestAnimationFrame(renderVisualizer);
-      analyser.getByteFrequencyData(dataArray);
-      for (let i = 0; i < BAR_COUNT; i++) {
-        const v = dataArray[i] / 255;
-        const bar = document.getElementById(`bar${i}`);
-        bar.style.height = `${Math.max(v, 0.05) * 100}%`;
-        // gradient from accent start to end
-        const r = Math.round((1 - v)*30 + v*80);
-        const g = Math.round((1 - v)*200 + v*255);
-        const b = Math.round((1 - v)*80 + v*120);
-        bar.style.background = `rgb(${r},${g},${b})`;
-      }
     }
   </script>
 </body>
