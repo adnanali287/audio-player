@@ -2,73 +2,79 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Audio Stream Player</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tab Audio Player</title>
   <style>
+    :root {
+      --bg: #0f0f0f;
+      --primary: #ffffff;
+      --accent: #4ade80;
+      --muted: #888888;
+    }
+
     body {
-      margin: 0;
-      padding: 0;
-      font-family: "Segoe UI", sans-serif;
-      background-color: #f5f5f5;
-      color: #333;
+      background-color: var(--bg);
+      color: var(--primary);
+      font-family: 'Inter', sans-serif;
       display: flex;
       flex-direction: column;
-      justify-content: center;
       align-items: center;
-      height: 100vh;
-      text-align: center;
-      overflow: hidden;
+      justify-content: center;
+      padding: 30px;
+      min-height: 100vh;
+      margin: 0;
     }
 
     h1 {
-      font-size: 22px;
+      font-size: 24px;
       margin-bottom: 10px;
-      animation: fadeIn 1s ease;
+      font-weight: 500;
     }
 
-    #status {
+    p {
+      color: var(--muted);
       font-size: 14px;
-      margin-top: 10px;
-      color: #555;
-      transition: all 0.3s ease;
-    }
-
-    .pulse {
-      color: #28a745;
-      animation: pulse 1.5s infinite;
+      margin-bottom: 30px;
+      text-align: center;
     }
 
     button {
-      padding: 12px 24px;
-      font-size: 16px;
-      background-color: #007aff;
-      color: white;
+      padding: 14px 26px;
       border: none;
-      border-radius: 8px;
+      border-radius: 12px;
+      background-color: var(--accent);
+      color: #000;
+      font-size: 16px;
+      font-weight: 600;
       cursor: pointer;
-      margin-top: 20px;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
-      transition: transform 0.2s ease;
+      transition: background 0.3s ease;
     }
 
-    button:active {
-      transform: scale(0.96);
+    button:hover {
+      background-color: #22c55e;
+    }
+
+    #status {
+      margin-top: 20px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .pulse {
+      color: var(--accent);
+      animation: pulse 1.4s infinite;
     }
 
     @keyframes pulse {
       0% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.1); opacity: 0.75; }
+      50% { transform: scale(1.05); opacity: 0.7; }
       100% { transform: scale(1); opacity: 1; }
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
     }
   </style>
 </head>
 <body>
-  <h1>Tab Audio Stream</h1>
+  <h1>🎧 Tab Audio Player</h1>
+  <p>Listen to your Chrome tab audio streamed live to this device.</p>
   <button onclick="start()">Start Listening</button>
   <div id="status">Idle</div>
 
@@ -79,48 +85,46 @@
     let isPlaying = false;
     const MIN_BUFFER = 3;
 
-    function setStatus(text, pulse = false) {
-      const statusDiv = document.getElementById("status");
-      statusDiv.textContent = text;
-      statusDiv.classList.toggle("pulse", pulse);
-    }
-
     function start() {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
       ws = new WebSocket("wss://audio-stream-backend-688e.onrender.com");
       ws.binaryType = "arraybuffer";
 
-      setStatus("Connecting and buffering…");
+      const statusDiv = document.getElementById("status");
+      statusDiv.textContent = "Connecting...";
 
       ws.onopen = () => {
-        setStatus("Connected. Waiting for audio…");
+        statusDiv.textContent = "Waiting for audio…";
       };
 
       ws.onmessage = (event) => {
-        const data = event.data.slice(0);
-        audioQueue.push(data);
+        audioQueue.push(event.data);
 
         if (!isPlaying && audioQueue.length >= MIN_BUFFER) {
           isPlaying = true;
-          setStatus("🎧 Listening", true);
+          statusDiv.textContent = "🎧 Listening";
+          statusDiv.classList.add("pulse");
           playNext();
         }
       };
 
       ws.onclose = () => {
         isPlaying = false;
-        setStatus("Disconnected");
+        statusDiv.textContent = "Disconnected";
+        statusDiv.classList.remove("pulse");
       };
 
       ws.onerror = () => {
-        setStatus("Connection error");
+        statusDiv.textContent = "Connection error";
+        statusDiv.classList.remove("pulse");
       };
     }
 
     function playNext() {
       if (audioQueue.length === 0) {
         isPlaying = false;
-        setStatus("Buffer underrun…");
+        document.getElementById("status").textContent = "Buffer underrun…";
+        document.getElementById("status").classList.remove("pulse");
         return;
       }
 
@@ -131,10 +135,7 @@
         source.connect(audioContext.destination);
         source.start(0);
         source.onended = playNext;
-      }, (err) => {
-        console.error("Decode error:", err);
-        playNext(); // continue regardless
-      });
+      }, () => playNext());
     }
   </script>
 </body>
