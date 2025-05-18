@@ -1,34 +1,49 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title>Audio Stream Player</title>
 </head>
 <body>
-  <h2>🔊 Live Audio Stream</h2>
-  <button onclick="connectStream()">Start Listening</button>
+  <h3>Tap to Start Listening</h3>
+  <button onclick="start()">Start Listening</button>
 
   <script>
+    let ws;
     let audioContext;
-    let source;
+    let audioQueue = [];
 
-    function connectStream() {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const ws = new WebSocket("wss://audio-stream-backend-688e.onrender.com");
+    function start() {
+      audioContext = new AudioContext();
+      ws = new WebSocket("wss://audio-stream-backend-688e.onrender.com");
       ws.binaryType = "arraybuffer";
 
       ws.onmessage = (event) => {
-        const arrayBuffer = event.data;
-        audioContext.decodeAudioData(arrayBuffer.slice(0), (audioBuffer) => {
-          source = audioContext.createBufferSource();
-          source.buffer = audioBuffer;
-          source.connect(audioContext.destination);
-          source.start(0);
-        });
+        const data = event.data.slice(0);
+        audioQueue.push(data);
       };
 
-      ws.onopen = () => console.log("Connected to stream");
-      ws.onerror = (e) => console.error("WebSocket error", e);
-      ws.onclose = () => console.log("Connection closed");
+      // Start playing with a 500ms buffer delay
+      setTimeout(playNext, 500);
+    }
+
+    function playNext() {
+      if (audioQueue.length === 0) {
+        setTimeout(playNext, 100);
+        return;
+      }
+
+      const chunk = audioQueue.shift();
+      audioContext.decodeAudioData(chunk, (buffer) => {
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioContext.destination);
+        source.start(0);
+        playNext(); // continue playing
+      }, (err) => {
+        console.error("Decode error", err);
+        playNext(); // skip bad chunk
+      });
     }
   </script>
 </body>
