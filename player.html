@@ -17,17 +17,25 @@
       align-items: center;
       height: 100vh;
       text-align: center;
+      overflow: hidden;
     }
 
     h1 {
       font-size: 22px;
       margin-bottom: 10px;
+      animation: fadeIn 1s ease;
     }
 
     #status {
       font-size: 14px;
       margin-top: 10px;
       color: #555;
+      transition: all 0.3s ease;
+    }
+
+    .pulse {
+      color: #28a745;
+      animation: pulse 1.5s infinite;
     }
 
     button {
@@ -40,10 +48,22 @@
       cursor: pointer;
       margin-top: 20px;
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+      transition: transform 0.2s ease;
     }
 
     button:active {
-      background-color: #005ecb;
+      transform: scale(0.96);
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.1); opacity: 0.75; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
   </style>
 </head>
@@ -59,16 +79,21 @@
     let isPlaying = false;
     const MIN_BUFFER = 3;
 
+    function setStatus(text, pulse = false) {
+      const statusDiv = document.getElementById("status");
+      statusDiv.textContent = text;
+      statusDiv.classList.toggle("pulse", pulse);
+    }
+
     function start() {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
       ws = new WebSocket("wss://audio-stream-backend-688e.onrender.com");
       ws.binaryType = "arraybuffer";
 
-      const statusDiv = document.getElementById("status");
-      statusDiv.textContent = "Connecting and buffering…";
+      setStatus("Connecting and buffering…");
 
       ws.onopen = () => {
-        statusDiv.textContent = "Connected. Waiting for audio…";
+        setStatus("Connected. Waiting for audio…");
       };
 
       ws.onmessage = (event) => {
@@ -77,31 +102,29 @@
 
         if (!isPlaying && audioQueue.length >= MIN_BUFFER) {
           isPlaying = true;
-          statusDiv.textContent = "🎧 Listening";
+          setStatus("🎧 Listening", true);
           playNext();
         }
       };
 
       ws.onclose = () => {
         isPlaying = false;
-        statusDiv.textContent = "Disconnected";
+        setStatus("Disconnected");
       };
 
-      ws.onerror = (err) => {
-        console.error("WebSocket error", err);
-        statusDiv.textContent = "Connection error";
+      ws.onerror = () => {
+        setStatus("Connection error");
       };
     }
 
     function playNext() {
       if (audioQueue.length === 0) {
         isPlaying = false;
-        document.getElementById("status").textContent = "Buffer underrun…";
+        setStatus("Buffer underrun…");
         return;
       }
 
       const chunk = audioQueue.shift();
-
       audioContext.decodeAudioData(chunk, (buffer) => {
         const source = audioContext.createBufferSource();
         source.buffer = buffer;
@@ -110,7 +133,7 @@
         source.onended = playNext;
       }, (err) => {
         console.error("Decode error:", err);
-        playNext(); // skip to next
+        playNext(); // continue regardless
       });
     }
   </script>
