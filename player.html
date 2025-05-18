@@ -7,34 +7,53 @@
 <body>
   <h3>Tap to Start Listening</h3>
   <button onclick="start()">Start Listening</button>
+  <div id="status">Idle</div>
 
   <script>
     let ws;
     let audioContext;
-    let playbackTime;
-    const BUFFER_AHEAD = 0.5; // half a second of buffer
+    let audioQueue = [];
+    let isPlaying = false;
+    let MIN_BUFFER = 3; // Number of chunks to buffer before playing
 
     function start() {
-      audioContext = new AudioContext();
-      playbackTime = audioContext.currentTime + BUFFER_AHEAD;
-
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
       ws = new WebSocket("wss://audio-stream-backend-688e.onrender.com");
       ws.binaryType = "arraybuffer";
+      document.getElementById("status").textContent = "Connected. Buffering...";
 
       ws.onmessage = (event) => {
-        const arrayBuffer = event.data.slice(0);
-        audioContext.decodeAudioData(arrayBuffer).then((buffer) => {
-          const source = audioContext.createBufferSource();
-          source.buffer = buffer;
-          source.connect(audioContext.destination);
+        const data = event.data.slice(0);
+        audioQueue.push(data);
 
-          // Schedule audio to play at the right time
-          source.start(playbackTime);
-          playbackTime += buffer.duration;
-        }).catch((err) => {
-          console.error("Decode error:", err);
-        });
+        if (!isPlaying && audioQueue.length >= MIN_BUFFER) {
+          isPlaying = true;
+          playNext(); // start playing
+        }
       };
+    }
+
+    function playNext() {
+      if (audioQueue.length === 0) {
+        isPlaying = false;
+        document.getElementById("status").textContent = "Buffer underrun…";
+        return;
+      }
+
+      const chunk = audioQueue.shift();
+
+      audioContext.decodeAudioData(chunk, (buffer) => {
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioContext.destination);
+        source.start(0);
+        source.onended = () => {
+          playNext(); // move to next chunk after playback
+        };
+      }, (err) => {
+        console.error("Decode error", err);
+        playNext(); // skip bad chunk
+      });
     }
   </script>
 </body>
