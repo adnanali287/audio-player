@@ -9,25 +9,14 @@
   <button onclick="start()">Start Listening</button>
   <div id="status">Idle</div>
 
-  <!-- Real audio element for background support -->
-  <audio id="keepAlive" autoplay loop>
-    <source src="data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCA//////////////////////8AAAAACAAADSAAAAEsAAABJbnRlcnBsYXllciBSZWFkAA==" type="audio/mp3">
-  </audio>
-
   <script>
     let ws;
     let audioContext;
     let audioQueue = [];
     let isPlaying = false;
-    const MIN_BUFFER = 3;
+    let MIN_BUFFER = 3; // Number of chunks to buffer before playing
 
     function start() {
-      // Play real audio for lock screen support
-      const keepAlive = document.getElementById("keepAlive");
-      keepAlive.volume = 0.01; // inaudible but not muted
-      keepAlive.play();
-
-      // Web audio setup
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
       ws = new WebSocket("wss://audio-stream-backend-688e.onrender.com");
       ws.binaryType = "arraybuffer";
@@ -39,7 +28,7 @@
 
         if (!isPlaying && audioQueue.length >= MIN_BUFFER) {
           isPlaying = true;
-          playNext();
+          playNext(); // start playing
         }
       };
     }
@@ -58,10 +47,12 @@
         source.buffer = buffer;
         source.connect(audioContext.destination);
         source.start(0);
-        source.onended = playNext;
+        source.onended = () => {
+          playNext(); // move to next chunk after playback
+        };
       }, (err) => {
         console.error("Decode error", err);
-        playNext();
+        playNext(); // skip bad chunk
       });
     }
   </script>
